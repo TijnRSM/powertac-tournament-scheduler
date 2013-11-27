@@ -40,6 +40,7 @@ public class Game implements Serializable
   private String simStartTime;
   private Integer gameLength = 0;
   private Integer lastTick = 0;
+  private Integer urgency;
 
   private Map<Integer, Agent> agentMap = new HashMap<Integer, Agent>();
 
@@ -144,7 +145,7 @@ public class Game implements Serializable
     }
 
     this.state = STATE.valueOf(status);
-    log.info(String.format("Update game: %s to %s", gameId, status));
+    log.info(String.format("Update game %s to %s", gameId, status));
 
     switch (state) {
       case boot_in_progress:
@@ -155,7 +156,7 @@ public class Game implements Serializable
       case boot_complete:
         Machine.delayedMachineUpdate(machine, 10);
         machine = null;
-        log.debug("Freeing Machine for game: " + gameId);
+        log.debug("Freeing Machine for game " + gameId);
 
         // Reset values when a game is aborted
         for (Agent agent: getAgentMap().values()) {
@@ -171,7 +172,7 @@ public class Game implements Serializable
         log.warn("BOOT " + gameId + " FAILED!");
         Machine.delayedMachineUpdate(machine, 10);
         machine = null;
-        log.debug("Freeing Machine for game: " + gameId);
+        log.debug("Freeing Machine for game " + gameId);
         break;
 
       case game_ready:
@@ -186,10 +187,10 @@ public class Game implements Serializable
           agent.setStateComplete();
           session.update(agent);
         }
-        log.info("Setting Agents to Complete for game: " + gameId);
+        log.info("Setting Agents to Complete for game " + gameId);
         Machine.delayedMachineUpdate(machine, 10);
         machine = null;
-        log.debug("Freeing Machine for game: " + gameId);
+        log.debug("Freeing Machine for game " + gameId);
         // If all games of round are complete, set round complete
         round.gameCompleted(gameId);
         break;
@@ -200,10 +201,10 @@ public class Game implements Serializable
           agent.setStateComplete();
           session.update(agent);
         }
-        log.info("Setting Agents to Complete for game: " + gameId);
+        log.info("Setting Agents to Complete for game " + gameId);
         Machine.delayedMachineUpdate(machine, 10);
         machine = null;
-        log.debug("Freeing Machine for game: " + gameId);
+        log.debug("Freeing Machine for game " + gameId);
         break;
     }
     session.update(this);
@@ -422,10 +423,9 @@ public class Game implements Serializable
   private void saveStandings ()
   {
     try {
-      gameLength = MemStore.getGameLengths().get(gameId);
+      gameLength = MemStore.getGameLengths().get(gameId) + 360;
       lastTick = Integer.parseInt(MemStore.getGameHeartbeats().get(gameId)[0]);
-    }
-    catch (Exception ignored) {
+    } catch (Exception ignored) {
     }
   }
 
@@ -484,48 +484,120 @@ public class Game implements Serializable
         .setInteger("roundId", round.getRoundId())
         .setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY).list();
 
-    // Get availability for participating brokers
+/*    // Get availability for participating brokers
     Map<Integer, Integer> availability =
-        Broker.getBrokerAvailability(session, round.getMaxAgents());
-    Collections.sort(fullList, new CustomGameComparator(availability));
+        Broker.getBrokerAvailability(session);
+    Collections.sort(fullList, new CustomGameComparator(availability));*/
     return fullList;
   }
 
+    // Create a string of all the round IDs of the rounds in the given List.
+    // Needed for a query to get all runable games.
   @SuppressWarnings("unchecked")
-  public static List<Game> getStartableGames (Session session, Round round)
+  public static String makeStringOfRoundIDs(List<Round> runningRounds)
   {
+      if (runningRounds == null || runningRounds.isEmpty())
+          return "";
+      String result = "(";
+      for (Round round: runningRounds)
+      {
+          result += "'" + round.getRoundId() + "',";
+      }
+      result = result.substring(0,result.length()-1);
+      result += ")";
+      return result;
+  }
+
+
+  // given a list of games (in practice all runable games), this function creates a double Map
+  // that shows how many runable games each broker has in any running tournament
+  // The result is in this form:
+  // Map<(tournamentID), Map<(brokerID), (number of appearences)>>
+  @SuppressWarnings("unchecked")
+  public static Map<Integer, Map<Integer, Integer>> countAppearences(List<Game> games)
+  {
+      Map<Integer, Map<Integer, Integer>> appearences = new HashMap<Integer, Map<Integer, Integer>>();
+
+    for (Game game: games)
+    {
+        int tournamentId = game.getRound().getLevel().getTournament().getTournamentId();
+        Map<Integer, Integer> innerMap = appearences.get(tournamentId);
+        if (innerMap == null)
+        {
+            innerMap = new HashMap<Integer, Integer>();
+        }
+
+        for (Agent agent: game.getAgentMap().values())
+        {
+            int brokerId = agent.getBrokerId();
+            if (innerMap.get(brokerId) == null)
+            {
+                innerMap.put(brokerId, 1);
+            }
+            else
+            {
+                innerMap.put(brokerId, innerMap.get(brokerId)+1);
+            }
+        }
+
+        appearences.put(tournamentId, innerMap);
+    }
+    return appearences;
+  }
+
+    /*  This function calculates the urgencies of the given games.
+     *  The input is a list of games for which the urgency needs to be calculated and a
+     *  double map 'appearences' that stores for every tournament/broker-combination how
+     *  often it appears in the currently startable games.
+     *  The urgency of is the sum of the appearences of all brokers in that tournament.
+     */
+    @SuppressWarnings("unchecked")
+    public static void setUrgencies(List<Game> games, Map<Integer, Map<Integer, Integer>> appearences)
+    {
+        for (Game game:games)
+        {
+            game.setUrgency(0);
+            for (Agent agent: game.getAgentMap().values())
+            {
+                game.setUrgency(game.getUrgency() + appearences.get(game.getRound().getLevel().getTournament().getTournamentId()).get(agent.getBrokerId()));
+            }
+        }
+    }
+
+    /*  This function returns a list of all startable games in order of urgency.
+     *  the urgency of a game is the sum of the startable games of all brokers in that game.
+     *  This favors the bigger games (more brokers) since they'll have a higher sum, and
+     *  it favors the games with brokers that still have a lot of games to do.
+     */
+    @SuppressWarnings("unchecked")
+  public static List<Game> getStartableGames (Session session, List<Round> runningRounds)
+  {
+    List<Game> result = new ArrayList<Game>();
+
+    // no running rounds means no games to check
+    if (runningRounds == null || runningRounds.isEmpty())
+        return result;
+
+    // use a query to retrieve all runable games (boot_complete) for the running rounds
+    String roundIDs = makeStringOfRoundIDs(runningRounds);
     List<Game> fullList = (List<Game>) session
-        .createQuery(Constants.HQL.GET_GAMES_BOOT_COMPLETE)
-        .setInteger("roundId", round.getRoundId())
+        .createQuery(Constants.HQL.GET_GAMES_BOOT_COMPLETE + roundIDs)
         .setTimestamp("startTime", Utils.offsetDate())
         .setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY).list();
 
-    // Get availability for participating brokers
-    Map<Integer, Integer> availability =
-        Broker.getBrokerAvailability(session, round.getMaxAgents());
+    // count the appearences of each broker in the runable games of each tournament
+    Map<Integer, Map<Integer, Integer>> appearences = countAppearences(fullList);
 
-    // We have do an extra loop, starting of games changes availability
-    List<Game> result = new ArrayList<Game>();
-    outerloop: while (fullList.size() > 0) {
-      Collections.sort(fullList, new CustomGameComparator(availability));
+    // calculate the urgencies of the games as the total number of runable games its brokers are playing in
+    setUrgencies(fullList, appearences);
 
-      Game game = fullList.remove(0);
+    // sort all games based on their urgency
+    Collections.sort(fullList, new CustomGameComparator());
 
-      // Ignore if game is not runnable
-      for (int brokerId: game.getAgentMap().keySet()) {
-        if (availability.get(brokerId) < 1) {
-          continue outerloop;
-        }
-      }
-
-      // Change availability
-      for (int brokerId: game.getAgentMap().keySet()) {
-        availability.put(brokerId, availability.get(brokerId) - 1);
-      }
-      result.add(game);
-    }
+    result = fullList;
 
     return result;
+
   }
 
   @SuppressWarnings("unchecked")
@@ -722,9 +794,33 @@ public class Game implements Serializable
   {
     this.lastTick = lastTick;
   }
+  @Transient
+  public Integer getUrgency()
+  {
+      return urgency;
+  }
+  public void setUrgency(int urgency)
+  {
+      this.urgency = urgency;
+  }
   //</editor-fold>
 
   static class CustomGameComparator implements Comparator<Game> {
+      public CustomGameComparator ()
+      {
+
+      }
+
+      public int compare (Game game1, Game game2)
+      {
+          if (game1.getUrgency() > game2.getUrgency())
+              return -1;
+          if (game1.getUrgency() < game2.getUrgency())
+              return 1;
+          return 0;
+      }
+
+/*   THE OLD COMPARATOR:
     private Map<Integer, Integer> availability;
 
     public CustomGameComparator (Map<Integer, Integer> availability)
@@ -785,6 +881,6 @@ public class Game implements Serializable
       }
 
       return 0;
-    }
+    }*/
   }
 }

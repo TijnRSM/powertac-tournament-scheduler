@@ -108,7 +108,6 @@ public class ActionRound implements InitializingBean
 
     roundInfo.add("MaxBrokers : " + round.getMaxBrokers());
     roundInfo.add("Registered Brokers : " + round.getBrokerMap().size());
-    roundInfo.add("MaxAgents : " + round.getMaxAgents());
 
     roundInfo.add(String.format("Size / multiplier 1 : %s / %s",
         round.getSize1(), round.getMultiplier1()));

@@ -46,10 +46,11 @@ CREATE TABLE `powertac_tournament`.`poms` (
 
 DROP TABLE IF EXISTS `powertac_tournament`.`tournaments`;
 CREATE TABLE `powertac_tournament`.`tournaments` (
-  `tournamentId`    INT(11)                                                                                                                                            NOT NULL AUTO_INCREMENT,
-  `tournamentName`  VARCHAR(256) UNIQUE                                                                                                                                NOT NULL,
+  `tournamentId`    INT(11)               	NOT NULL AUTO_INCREMENT,
+  `tournamentName`  VARCHAR(256) UNIQUE	NOT NULL,
   `state`           ENUM('open', 'closed', 'scheduled0', 'completed0', 'scheduled1', 'completed1', 'scheduled2', 'completed2', 'scheduled3', 'completed3', 'complete') NOT NULL,
-  `pomId`           INT(11)                                                                                                                                            NOT NULL,
+  `pomId`           INT(11)               	NOT NULL,
+  `maxAgents`       INT(11)               	NOT NULL DEFAULT 2,
   PRIMARY KEY (`tournamentId`),
   CONSTRAINT tournament_refs FOREIGN KEY (`pomId`) REFERENCES `powertac_tournament`.`poms` (`pomId`)
 )
@@ -81,7 +82,7 @@ CREATE TABLE `powertac_tournament`.`rounds` (
   `dateFrom`    DATETIME                                   NOT NULL,
   `dateTo`      DATETIME                                   NOT NULL,
   `maxBrokers`  INT(11)                                    NOT NULL,
-  `maxAgents`   INT(11)                                    NOT NULL DEFAULT 2,
+  `maxAgents`   INT(11)                                    NOT NULL,
   `gameSize1`   INT(11)                                    NOT NULL,
   `gameSize2`   INT(11)                                    NOT NULL,
   `gameSize3`   INT(11)                                    NOT NULL,

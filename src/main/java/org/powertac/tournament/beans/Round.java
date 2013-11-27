@@ -59,8 +59,8 @@ public class Round
     Transaction transaction = session.beginTransaction();
     try {
       Round round = (Round) session
-          .createQuery(Constants.HQL.GET_ROUND_BY_ID)
-          .setInteger("roundId", roundId).uniqueResult();
+              .createQuery(Constants.HQL.GET_ROUND_BY_ID)
+              .setInteger("roundId", roundId).uniqueResult();
 
       Level level = round.getLevel();
       level.setNofRounds(level.getNofRounds() - 1);
@@ -70,14 +70,14 @@ public class Round
         if (game.isBooting() || game.isRunning()) {
           transaction.rollback();
           return String.format("Game %s can not be removed, state = %s",
-              game.getGameName(), game.getState());
+                  game.getGameName(), game.getState());
         }
       }
 
       @SuppressWarnings("unchecked")
       List<RoundBroker> roundBrokers = (List<RoundBroker>) session
-          .createCriteria(RoundBroker.class)
-          .add(Restrictions.eq("round", round)).list();
+              .createCriteria(RoundBroker.class)
+              .add(Restrictions.eq("round", round)).list();
       for (RoundBroker roundBroker : roundBrokers) {
         session.delete(roundBroker);
       }
@@ -113,7 +113,7 @@ public class Round
       if (game.getGameId() == finishedGameId) {
         continue;
       }
-      if (!game.isComplete()) {
+      if ((!game.isComplete()) && (game.getRound() == this)) {
         allDone = false;
       }
     }
@@ -122,10 +122,7 @@ public class Round
       state = STATE.complete;
 
       Scheduler scheduler = Scheduler.getScheduler();
-      if (scheduler.getRunningRound() != null &&
-          scheduler.getRunningRound().getRoundId() == roundId) {
-        scheduler.unloadRound();
-      }
+      scheduler.unloadRound(this.getRoundId());
     }
 
     // Always generate new CSVs
@@ -160,13 +157,13 @@ public class Round
   {
     String result = "";
     if (size1 > 0 && multiplier1 > 0) {
-      result += size1 +":"+ multiplier1 +" ";
+      result += size1 + ":" + multiplier1 + " ";
     }
     if (size2 > 0 && multiplier2 > 0) {
-      result += size2 +":"+ multiplier2 +" ";
+      result += size2 + ":" + multiplier2 + " ";
     }
     if (size3 > 0 && multiplier3 > 0) {
-      result += size3 +":"+ multiplier3;
+      result += size3 + ":" + multiplier3;
     }
     return result;
   }
@@ -344,10 +341,10 @@ public class Round
 
   @ManyToMany
   @JoinTable(name = "round_brokers",
-      joinColumns =
-      @JoinColumn(name = "roundId", referencedColumnName = "roundId"),
-      inverseJoinColumns =
-      @JoinColumn(name = "brokerId", referencedColumnName = "brokerId")
+          joinColumns =
+          @JoinColumn(name = "roundId", referencedColumnName = "roundId"),
+          inverseJoinColumns =
+          @JoinColumn(name = "brokerId", referencedColumnName = "brokerId")
   )
   @MapKey(name = "brokerId")
   public Map<Integer, Broker> getBrokerMap ()
@@ -451,8 +448,8 @@ public class Round
   {
     return startTime;
   }
-  public void setStartTime (Date startTime)
-  {
+
+  public void setStartTime(Date startTime) {
     this.startTime = startTime;
   }
 

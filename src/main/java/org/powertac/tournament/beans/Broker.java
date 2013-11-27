@@ -31,8 +31,7 @@ public class Broker
 
   private Map<Integer, Agent> agentMap = new HashMap<Integer, Agent>();
   private Map<Integer, Round> roundMap = new HashMap<Integer, Round>();
-  private Map<Integer, Tournament> tournamentMap =
-      new HashMap<Integer, Tournament>();
+  private Map<Integer, Tournament> tournamentMap = new HashMap<Integer, Tournament>();
 
   // For edit mode, web interface
   private boolean edit;
@@ -291,24 +290,43 @@ public class Broker
     }
   }
 
-  // Check if not more than maxBrokers are running
-  public boolean hasAgentsAvailable ()
+  // Check if there are still agents available
+  public boolean hasAgentsAvailable (Round round)
   {
+    boolean found = false;
     Scheduler scheduler = Scheduler.getScheduler();
-    Round runningRound = scheduler.getRunningRound();
+    List<Round> runningRounds = scheduler.getRunningRounds();
 
     // Shouldn't happen (no games should start when no round loaded)
-    if (runningRound == null) {
+    if (runningRounds == null || runningRounds.size() == 0)
+    {
       return false;
     }
 
-    int freeAgents = runningRound.getMaxAgents();
-    for (Agent agent: agentMap.values()) {
-      if (agent.getGame().isRunning()) {
-        freeAgents--;
-      }
+    // If there are running rounds, but this one is not (should also not happen)
+    for (Round runningRound:runningRounds)
+    {
+        if (runningRound.getRoundId() == round.getRoundId())
+            found = true;
+    }
+    if (!found)
+    {
+        return false;
     }
 
+    // Round is running, now check for free agents
+    int freeAgents = round.getLevel().getTournament().getMaxAgents();
+    int tournamentID = round.getLevel().getTournament().getTournamentId();
+    for (Agent agent: agentMap.values()) {
+      Game game = agent.getGame();
+      if (game.isRunning() && game.getRound().getLevel().getTournament().getTournamentId() == tournamentID)
+      {
+        // every agent that is in a game that is running and from the same tournament
+        // reduces the amount of availabele agents.
+        freeAgents--;
+      }
+
+    }
     return freeAgents > 0;
   }
 
@@ -400,8 +418,7 @@ public class Broker
 
   // This creates a map with brokerId <--> # of free agents
   @SuppressWarnings("unchecked")
-  public static Map<Integer, Integer> getBrokerAvailability (Session session,
-                                                             int maxAgents)
+  public static Map<Integer, Integer> getBrokerAvailability (Session session, Tournament tournament)
   {
     Map<Integer, Integer> result = new HashMap<Integer, Integer>();
 
@@ -417,9 +434,11 @@ public class Broker
         continue;
       }
 
-      result.put(brokerId, maxAgents);
+      result.put(brokerId, tournament.getMaxAgents());
       for (Agent agent: broker.getAgentMap().values()) {
-        if (agent.getGame().isRunning()) {
+        Game game = agent.getGame();
+
+        if (game.isRunning() && game.getRound().getLevel().getTournament().getTournamentId() == tournament.getTournamentId()) {
           result.put(brokerId, result.get(brokerId) - 1);
         }
       }
@@ -448,7 +467,7 @@ public class Broker
       }
 
       // Check if broker is registered for this tournament
-      if (tournamentMap.get(round.getLevel().getTournamentId()) == null) {
+      if (tournamentMap.get(round.getLevel().getTournament().getTournamentId()) == null) {
         continue;
       }
 
@@ -696,5 +715,5 @@ public class Broker
   {
     this.unregisterTournamentId = selectedUnregisterTournamentId;
   }
-  //</editor-fold>
+   //</editor-fold>
 }

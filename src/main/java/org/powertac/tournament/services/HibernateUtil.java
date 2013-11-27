@@ -32,6 +32,7 @@ public class HibernateUtil
     } catch (Throwable ex) {
       // Make sure you log the exception, as it might be swallowed
       log.error("Initial SessionFactory creation failed.\n" + ex);
+      ex.printStackTrace();
       throw new ExceptionInInitializerError(ex);
     }
   }

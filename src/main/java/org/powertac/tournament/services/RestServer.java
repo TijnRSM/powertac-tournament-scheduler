@@ -298,7 +298,7 @@ public class RestServer
     int gameId = Integer.parseInt(
         params.get(Constants.Rest.REQ_PARAM_GAMEID)[0]);
 
-    log.info(String.format("Received %s message from game: %s",
+    log.info(String.format("Received %s message from game %s",
         statusString, gameId));
 
     Session session = HibernateUtil.getSession();
@@ -310,7 +310,7 @@ public class RestServer
 
       if (game == null) {
         log.warn(String.format("Trying to set status %s on non-existing "
-            + "game : %s", statusString, gameId));
+            + "game %s", statusString, gameId));
         return "error";
       }
 

@@ -108,20 +108,16 @@ public class RestBroker
   private String getReadyString (Session session, Broker broker,
                                  String loginResponse, int tournamentId)
   {
-    // Wait 10 seconds, game is set ready before it actually starts
-    long readyDeadline = 10 * 1000;
-    long nowStamp = Utils.offsetDate().getTime();
+//    long readyDeadline = 2 * 60 * 1000;
+//    long readyDeadline = 0;  // If all is well, it should not be needed for the broker to wait for the visualiser
+//    long nowStamp = Utils.offsetDate().getTime();
 
     Query query = session.createQuery(Constants.HQL.GET_GAMES_READY);
     List<Game> games = (List<Game>) query.
         setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY).list();
 
     for (Game game: games) {
-      if (game.getRound().getLevel().getTournamentId() != tournamentId) {
-        continue;
-      }
-
-      if ((nowStamp - game.getReadyTime().getTime()) < readyDeadline) {
+      if (game.getRound().getLevel().getTournament().getTournamentId() != tournamentId) {
         continue;
       }
 

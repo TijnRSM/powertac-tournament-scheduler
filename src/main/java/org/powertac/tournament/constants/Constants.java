@@ -125,6 +125,7 @@ public class Constants
     public static final String GET_ROUNDS_NOT_COMPLETE =
         "FROM Round AS round "
             + "LEFT JOIN FETCH round.level as level "
+            + "LEFT JOIN FETCH level.roundMap as roundMap "
             + "LEFT JOIN FETCH round.gameMap as gameMap "
             + "LEFT JOIN FETCH gameMap.agentMap AS agentMap "
             + "LEFT JOIN FETCH gameMap.machine "
@@ -151,20 +152,22 @@ public class Constants
             + "WHERE game.state='" + Game.getStateBootPending() + "' "
             + "AND round.roundId =:roundId";
 
-    public static final String GET_GAMES_BOOT_COMPLETE =
-        "FROM Game AS game "
-            + "LEFT JOIN FETCH game.round AS round "
-            + "LEFT JOIN FETCH game.machine "
-            + "LEFT JOIN FETCH game.agentMap AS agentMap "
-            + "LEFT JOIN FETCH agentMap.broker AS broker "
-            + "LEFT JOIN FETCH broker.user "
-            + "LEFT JOIN FETCH broker.agentMap "
+      public static final String GET_GAMES_BOOT_COMPLETE =
+              "FROM Game AS game "
+                      + "LEFT JOIN FETCH game.round AS round "
+                      + "LEFT JOIN FETCH round.level AS level "
+                      + "LEFT JOIN FETCH level.tournament AS tournament "
+                      + "LEFT JOIN FETCH game.machine "
+                      + "LEFT JOIN FETCH game.agentMap AS agentMap "
+                      + "LEFT JOIN FETCH agentMap.broker AS broker "
+                      + "LEFT JOIN FETCH broker.user "
+                      + "LEFT JOIN FETCH broker.agentMap "
 
-            + "WHERE game.state='" + Game.getStateBootComplete() + "' "
-            + "AND game.startTime < :startTime "
-            + "AND round.roundId =:roundId";
+                      + "WHERE game.state='" + Game.getStateBootComplete() + "' "
+                      + "AND game.startTime < :startTime "
+                      + "AND round.roundId IN ";
 
-    public static final String GET_GAMES_NOT_COMPLETE =
+      public static final String GET_GAMES_NOT_COMPLETE =
         "FROM Game AS game "
             + "LEFT JOIN FETCH game.round "
             + "LEFT JOIN FETCH game.machine "
